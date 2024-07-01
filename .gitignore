@@ -1,0 +1,14 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+tests/
+token.bat
+venv/
+
+bookmarks.db
+
+temp/
