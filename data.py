@@ -12,6 +12,26 @@ def init_db():
     conn.commit()
     conn.close()
 
+def search_by_url_pattern(url):
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    query="SELECT * FROM bookmarks WHERE url LIKE ?"
+    c.execute(query,(url,))
+
+    bookmarks = c.fetchall()
+    conn.close()
+    return bookmarks
+
+def search_by_exact_url(url):
+    conn = sqlite3.connect(DB_NAME)
+    print(f'{url}xxxxxxxx')
+    c = conn.cursor()
+    query="SELECT * FROM bookmarks WHERE url=?"
+    c.execute(query,(url,))
+    bookmarks = c.fetchall()
+    conn.close()
+    print(bookmarks)
+    return bookmarks
 
 # Save bookmark
 def save_bookmark(url, title=None, description=None, tags=None):
