@@ -129,12 +129,12 @@ def format_tags(tag_string, delimiter=TAG_DELIMITER):
 async def search_bookmark(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
     if len(args) == 0:
-        await update.message.reply_text('Please provide an URL to search.')
+        await update.message.reply_text('Please provide URL or tags to search.')
         return
-        
-    url_pattern = args[0]
-
-    bookmarks = data.search_by_url_pattern(url_pattern)
+    args_str=' '.join(args)
+    url, tags_arr = extract_url_and_tags(args_str)
+    
+    bookmarks = data.search_by_url_pattern(url,tags_arr)
     if bookmarks:
         await update.message.reply_text('Here are the bookmarks matching your search.')
         i=0
@@ -220,6 +220,7 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("add", add_bookmark))
     application.add_handler(CommandHandler("ls", list_bookmarks))
+    application.add_handler(CommandHandler("se", search_bookmark))
     #application.add_handler(CommandHandler("rm", rm_bookmark))
     application.add_handler(CommandHandler("rm", handle_reply_command, filters=filters.REPLY))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

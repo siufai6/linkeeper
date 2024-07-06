@@ -16,12 +16,22 @@ def init_db():
     finally:
         conn.close()
 
-def search_by_url_pattern(url):
+def search_by_url_pattern(url, tags):
     try:
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        query = "SELECT * FROM bookmarks WHERE url LIKE ?"
-        c.execute(query, (url,))
+        params = [f'%{url}%',f'%{url}%', f'%{url}%']
+        i=0
+        tag_query = ' or (' if len(tags)>0 else ''
+        for tag in tags:
+            if i>0: tag_query += ' or  '
+            tag_query += f" tags like ? " 
+            params.append(f'%{tag}%')
+        tag_query += " )" if len(tags)>0 else ''
+
+        query = "SELECT * FROM bookmarks WHERE url LIKE ? or title LIKE ? or description LIKE ? " + tag_query
+        logger.info(f"Query: {query}, Params: {params}")
+        c.execute(query, params)
 
         bookmarks = c.fetchall()
         return bookmarks
