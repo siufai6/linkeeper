@@ -1,5 +1,4 @@
 import sqlite3
-import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram.ext import MessageHandler, filters
@@ -7,13 +6,8 @@ import asyncio
 import data as data 
 import re
 import os
-
-# Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-TAG_DELIMITER="|"
+import parser as parser
+from config import logger, TAG_DELIMITER
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = (
@@ -77,10 +71,10 @@ async def rm_bookmark(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('No ID provided. e.g use /ls to list bookmarks, take note of the ID, type /rm [ID] to remove.')
         return
         
-    id = args[0]
-    logger.info(f"Removing bookmark with id {id}")
+    ids = args[0:]
+    logger.info(f"Removing bookmark with id {ids}")
     try:
-        data.delete_bookmark_by_id(id=id)
+        data.delete_bookmark_by_id(ids=ids)
         await update.message.reply_text('Bookmark removed!')
     except Exception as e:
         logger.error(f"Failed to remove bookmark: {e}")
@@ -92,6 +86,7 @@ async def handle_reply_command(update: Update, context):
     this function will handle the command when it is a reply to a message, e.g. when the user sends /rm in reply to a message
     """
     command = update.message.text  # This will be the command
+    print(command)
     original_message = update.message.reply_to_message
     logger.info(f"Received command: {command}")
     if original_message:
@@ -161,12 +156,12 @@ async def list_bookmarks(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 tags = format_tags(bookmark[4])
                 #tags_arr = bookmark[4].split('|')
                 #tags = ' '.join([f'#{tag}' for tag in tags_arr])
-            await update.message.reply_text(f'ID:{bookmark[0]}: {bookmark[1]} {tags}')
+            await update.message.reply_text(f'ID:{bookmark[0]}: {bookmark[1]} {bookmark[2]}  {tags}')
     else:
         await update.message.reply_text('You have no bookmarks saved.')
 
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def process_non_command_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
         this function will handle the text when it is not a command, e.g. when the user sends a URL
     """
@@ -182,22 +177,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def process_bookmark(update, url, tags):
-    message = f"URL detected: {url}"
+    title=parser.fetch_page_title(url)
+    logger.info(f"URL detected: {url} {title}")
     existing_bookmark = data.search_by_exact_url(url)
     if len(existing_bookmark) > 0:
         bookmark_id, _, _, _, existing_tags = existing_bookmark[0]
         logger.info(f'Bookmark already exists. {bookmark_id} {url} {existing_tags}')
         # remove old bookmarks
-        data.delete_bookmark_by_id(bookmark_id)
+        data.delete_bookmark_by_id([bookmark_id])
         message="Bookmark already exists and  updated."
     else:
         message="Bookmark added."
         logger.info(f"Adding bookmark with url {url} and tags {tags}")
         # Adjust the save_bookmark call according to how many tags you found
     if len(tags) == 0:
-        data.save_bookmark(url=url)
+        data.save_bookmark(url=url,title=title,description=None,tags=None)
     else:
-        data.save_bookmark(url=url, title=None, description=None, tags=tags)
+        data.save_bookmark(url=url, title=title, description=None, tags=tags)
 
     await update.message.reply_text(message)
 
@@ -205,7 +201,6 @@ async def process_bookmark(update, url, tags):
 
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.warning('Update "%s" caused error "%s"', update, context.error)
-
 
 
 def main():
@@ -221,9 +216,9 @@ def main():
     application.add_handler(CommandHandler("add", add_bookmark))
     application.add_handler(CommandHandler("ls", list_bookmarks))
     application.add_handler(CommandHandler("se", search_bookmark))
-    #application.add_handler(CommandHandler("rm", rm_bookmark))
-    application.add_handler(CommandHandler("rm", handle_reply_command, filters=filters.REPLY))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    # the following handles both /rm 1 2 3 4 and also reply and /rm case
+    application.add_handler(CommandHandler("rm", handle_reply_command, filters=filters.ChatType.PRIVATE))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_non_command_text))
     application.add_error_handler(error)
 
     application.run_polling()

@@ -1,6 +1,6 @@
 # Database setup
 import sqlite3
-from linkeeper import logger
+from config import logger, TAG_DELIMITER
 
 DB_NAME = 'bookmarks.db'
 def init_db():
@@ -51,12 +51,18 @@ def search_by_exact_url(url):
         logger.error(f"Failed to search bookmarks by exact URL: {e}")
         return []
 
-def delete_bookmark_by_id(id):
+def delete_bookmark_by_id(ids):
     try:
         conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        c.execute('DELETE FROM bookmarks WHERE id= ?', (id,))
+        placeholders = ', '.join('?' for _ in ids)
+        query = f'DELETE FROM bookmarks WHERE id IN ({placeholders})'
+        c.execute(query, ids)
         conn.commit()
+        if c.rowcount > 0:
+            logger.info(f"Deleted {c.rowcount} bookmarks.")
+        else:
+            logger.info("No bookmarks found with the given IDs.")
     except sqlite3.Error as e:
         logger.error(f"Failed to delete bookmark: {e}")
     finally:
